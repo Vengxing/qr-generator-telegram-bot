@@ -6,6 +6,24 @@ import { generateFHDCard } from './services/qrRenderer.js';
 
 const bot = new Telegraf(CONFIG.BOT_TOKEN);
 
+// Gracefully handle expired callback queries (e.g. clicking buttons on old messages)
+bot.use(async (ctx, next) => {
+  if (ctx.callbackQuery) {
+    const originalAnswerCbQuery = ctx.answerCbQuery.bind(ctx);
+    ctx.answerCbQuery = async (...args) => {
+      try {
+        return await originalAnswerCbQuery(...args);
+      } catch (err) {
+        if (err.description && err.description.includes('query is too old')) {
+          return false;
+        }
+        throw err;
+      }
+    };
+  }
+  return next();
+});
+
 /**
  * Downloads a Telegram file into a Buffer.
  */
@@ -45,7 +63,7 @@ async function renderCurrentStep(ctx, userId, extraMessage = '') {
         '• Automatic QR detection & validation\n' +
         '• Optional custom logo or photo in bottom-left\n' +
         '• 1 or 2 lines of custom text (max 20 chars)\n' +
-        '• Exported in crisp **Full HD (1080x1280)**\n' +
+        '• Exported in crisp **Full HD (1080x1360)**\n' +
         '• ↩️ *Full reversibility: Go back or change your mind at any point!*';
       keyboard = Markup.removeKeyboard();
       await ctx.reply(message, { parse_mode: 'Markdown' });
@@ -448,7 +466,7 @@ async function handleGenerateCard(ctx, userId) {
           '🎉 *Here is your Standardized Full HD QR Card!*\n\n' +
           `• Line 1: ${escapeMarkdown(line1)}\n` +
           (line2 ? `• Line 2: ${escapeMarkdown(line2)}\n` : '') +
-          '• Resolution: **1080 × 1280 (FHD)**\n\n' +
+          '• Resolution: **1080 × 1360 (FHD)**\n\n' +
           '👇 An uncompressed document file is also sent below for maximum print & display quality.',
         parse_mode: 'Markdown',
       }
@@ -456,9 +474,9 @@ async function handleGenerateCard(ctx, userId) {
 
     // Send uncompressed document to prevent Telegram compression
     await ctx.replyWithDocument(
-      { source: cardBuffer, filename: 'qr_card_fhd_1080x1280.png' },
+      { source: cardBuffer, filename: 'qr_card_fhd_1080x1360.png' },
       {
-        caption: '📁 *Original Full HD (1080x1280) PNG file.*',
+        caption: '📁 *Original Full HD (1080x1360) PNG file.*',
         parse_mode: 'Markdown',
       }
     );
@@ -480,7 +498,12 @@ async function handleGenerateCard(ctx, userId) {
 
 // ---------------- Start Bot ----------------
 
-bot.launch(() => {
+bot.catch((err, ctx) => {
+  if (err.description && err.description.includes('query is too old')) return;
+  console.error(`Unhandled bot error on update ${ctx?.update?.update_id}:`, err.message || err);
+});
+
+bot.launch({ dropPendingUpdates: true }, () => {
   console.log('🚀 QR Studio Bot is up and running!');
 });
 

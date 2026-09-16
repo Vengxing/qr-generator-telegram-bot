@@ -57,7 +57,7 @@ function drawCircularImage(ctx, img, x, y, size) {
  * @param {number} options.lineCount - 1 or 2
  * @param {string} options.line1 - First line text (max 20 chars)
  * @param {string} [options.line2] - Second line text (max 20 chars, if 2 lines)
- * @returns {Promise<Buffer>} PNG buffer in FHD 1080x1280
+ * @returns {Promise<Buffer>} PNG buffer in FHD 1080x1360
  */
 export async function generateFHDCard({
   qrData,
@@ -67,7 +67,7 @@ export async function generateFHDCard({
   line2 = '',
 }) {
   const width = CONFIG.CANVAS.WIDTH;   // 1080
-  const height = CONFIG.CANVAS.HEIGHT; // 1280
+  const height = CONFIG.CANVAS.HEIGHT; // 1360
 
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext('2d');
@@ -106,7 +106,7 @@ export async function generateFHDCard({
   const bottomSectionWidth = qrSize; // 1008px
   const bottomSectionX = qrX;        // 36px
   const bottomSectionY = qrY + qrSize + 24; // 36 + 1008 + 24 = 1068px
-  const bottomSectionHeight = height - bottomSectionY - margin; // 1280 - 1068 - 36 = 176px
+  const bottomSectionHeight = height - bottomSectionY - margin; // 1360 - 1068 - 36 = 256px
 
   // Bottom row card container
   drawRoundedRect(
@@ -124,9 +124,10 @@ export async function generateFHDCard({
   ctx.stroke();
 
   // Bottom-Left: Photo / Avatar
-  const photoSize = 136;
-  const photoX = bottomSectionX + 20;
-  const photoY = bottomSectionY + (bottomSectionHeight - photoSize) / 2;
+  const photoPadding = 20;
+  const photoSize = bottomSectionHeight - photoPadding * 2; // 216px
+  const photoX = bottomSectionX + photoPadding;
+  const photoY = bottomSectionY + photoPadding;
 
   if (photoBuffer) {
     try {
@@ -141,45 +142,69 @@ export async function generateFHDCard({
   }
 
   // Same Row: Text next to the photo (middle-aligned in the remaining row area)
-  const contentRight = bottomSectionX + bottomSectionWidth - 24;
-  const contentLeft = photoX + photoSize + 24;
+  const contentRight = bottomSectionX + bottomSectionWidth - 20;
+  const contentLeft = photoX + photoSize + 20;
   const textCenterX = (contentLeft + contentRight) / 2;
   const maxTextWidth = contentRight - contentLeft;
 
   ctx.textAlign = 'center';
 
   if (lineCount === 1 || !line2) {
-    // 1 Line: Large, bold, perfectly middle-aligned both horizontally and vertically
-    const textCenterY = bottomSectionY + bottomSectionHeight / 2;
+    // 1 Line: Bold, prominent headline dynamically sized to fill space and scale down for long text
+    const rawText = line1 || 'SCAN TO OPEN';
+    const fontSize = calculateFittingFontSize(ctx, rawText, {
+      maxFontSize: 130,
+      minFontSize: 36,
+      fontWeight: 'bold',
+      fontFamily: 'sans-serif',
+      maxWidth: maxTextWidth,
+    });
 
+    const textCenterY = bottomSectionY + bottomSectionHeight / 2;
     ctx.fillStyle = '#0f172a';
-    ctx.font = 'bold 50px sans-serif';
+    ctx.font = `bold ${fontSize}px sans-serif`;
     ctx.textBaseline = 'middle';
 
-    const displayLine = fitText(ctx, line1 || 'SCAN TO OPEN', maxTextWidth);
+    const displayLine = fitText(ctx, rawText, maxTextWidth);
     ctx.fillText(displayLine, textCenterX, textCenterY);
   } else {
-    // 2 Lines: Line 1 + Line 2 perfectly middle-aligned horizontally and as a balanced vertical block
-    const textCenterY = bottomSectionY + bottomSectionHeight / 2;
+    // 2 Lines: Dynamic sizing for both lines, perfectly vertically balanced
+    const rawLine1 = line1 || '';
+    const rawLine2 = line2 || '';
 
-    const line1FontSize = 42;
-    const line2FontSize = 30;
-    const lineSpacing = 10;
-    const totalBlockHeight = line1FontSize + lineSpacing + line2FontSize; // 82px
+    const line1FontSize = calculateFittingFontSize(ctx, rawLine1, {
+      maxFontSize: 82,
+      minFontSize: 32,
+      fontWeight: 'bold',
+      fontFamily: 'sans-serif',
+      maxWidth: maxTextWidth,
+    });
+
+    const line2FontSize = calculateFittingFontSize(ctx, rawLine2, {
+      maxFontSize: 52,
+      minFontSize: 24,
+      fontWeight: 'normal',
+      fontFamily: 'sans-serif',
+      maxWidth: maxTextWidth,
+    });
+
+    const lineSpacing = Math.round(line1FontSize * 0.18);
+    const totalBlockHeight = line1FontSize + lineSpacing + line2FontSize;
+    const textCenterY = bottomSectionY + bottomSectionHeight / 2;
     const blockTopY = textCenterY - totalBlockHeight / 2;
 
     // Line 1 (Primary Title)
     ctx.fillStyle = '#0f172a';
     ctx.font = `bold ${line1FontSize}px sans-serif`;
     ctx.textBaseline = 'top';
-    const displayLine1 = fitText(ctx, line1, maxTextWidth);
+    const displayLine1 = fitText(ctx, rawLine1, maxTextWidth);
     ctx.fillText(displayLine1, textCenterX, blockTopY);
 
     // Line 2 (Secondary Subtitle)
     ctx.fillStyle = '#64748b';
     ctx.font = `normal ${line2FontSize}px sans-serif`;
     ctx.textBaseline = 'top';
-    const displayLine2 = fitText(ctx, line2, maxTextWidth);
+    const displayLine2 = fitText(ctx, rawLine2, maxTextWidth);
     ctx.fillText(displayLine2, textCenterX, blockTopY + line1FontSize + lineSpacing);
   }
 
@@ -206,20 +231,20 @@ function drawPlaceholderAvatar(ctx, x, y, size) {
   ctx.fill();
 
   // Outer border
-  ctx.lineWidth = 4;
+  ctx.lineWidth = Math.max(4, Math.round(size * 0.025));
   ctx.strokeStyle = '#93c5fd';
   ctx.stroke();
 
   // Crisp vector icon (stylized QR scanner frame)
-  const iconSize = 56;
+  const iconSize = Math.round(size * 0.42);
   const ix = cx - iconSize / 2;
   const iy = cy - iconSize / 2;
 
   ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 4.5;
+  ctx.lineWidth = Math.max(4, Math.round(size * 0.032));
   ctx.lineCap = 'round';
 
-  const cornerLen = 14;
+  const cornerLen = Math.round(iconSize * 0.25);
   // Top-left corner
   ctx.beginPath();
   ctx.moveTo(ix, iy + cornerLen);
@@ -230,7 +255,7 @@ function drawPlaceholderAvatar(ctx, x, y, size) {
   // Top-right corner
   ctx.beginPath();
   ctx.moveTo(ix + iconSize - cornerLen, iy);
-  ctx.lineTo(ix + iconSize, iy);
+  ctx.lineTo(ix + iconSize);
   ctx.lineTo(ix + iconSize, iy + cornerLen);
   ctx.stroke();
 
@@ -250,11 +275,33 @@ function drawPlaceholderAvatar(ctx, x, y, size) {
 
   // Center dot
   ctx.beginPath();
-  ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+  ctx.arc(cx, cy, Math.max(6, Math.round(size * 0.045)), 0, Math.PI * 2);
   ctx.fillStyle = '#ffffff';
   ctx.fill();
 
   ctx.restore();
+}
+
+/**
+ * Calculates the optimal font size between minFontSize and maxFontSize
+ * to ensure text fits within maxWidth, starting big to fill space.
+ */
+function calculateFittingFontSize(
+  ctx,
+  text,
+  { maxFontSize, minFontSize = 24, fontWeight = 'bold', fontFamily = 'sans-serif', maxWidth }
+) {
+  if (!text) return maxFontSize;
+
+  let fontSize = maxFontSize;
+  while (fontSize > minFontSize) {
+    ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+    if (ctx.measureText(text).width <= maxWidth) {
+      return fontSize;
+    }
+    fontSize -= 2;
+  }
+  return minFontSize;
 }
 
 /**

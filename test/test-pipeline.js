@@ -60,8 +60,8 @@ async function runTest() {
   const card1Meta = await sharp(card1).metadata();
   console.log(`Card 1 Dimensions: ${card1Meta.width}x${card1Meta.height}, Format: ${card1Meta.format}`);
 
-  if (card1Meta.width !== 1080 || card1Meta.height !== 1280) {
-    throw new Error(`Expected dimensions 1080x1280, got ${card1Meta.width}x${card1Meta.height}`);
+  if (card1Meta.width !== 1080 || card1Meta.height !== 1360) {
+    throw new Error(`Expected dimensions 1080x1360, got ${card1Meta.width}x${card1Meta.height}`);
   }
 
   fs.writeFileSync(path.join(outputDir, 'test_card_1_line.png'), card1);
@@ -80,15 +80,26 @@ async function runTest() {
   const card2Meta = await sharp(card2).metadata();
   console.log(`Card 2 Dimensions: ${card2Meta.width}x${card2Meta.height}, Format: ${card2Meta.format}`);
 
-  if (card2Meta.width !== 1080 || card2Meta.height !== 1280) {
-    throw new Error(`Expected dimensions 1080x1280, got ${card2Meta.width}x${card2Meta.height}`);
+  if (card2Meta.width !== 1080 || card2Meta.height !== 1360) {
+    throw new Error(`Expected dimensions 1080x1360, got ${card2Meta.width}x${card2Meta.height}`);
   }
 
   fs.writeFileSync(path.join(outputDir, 'test_card_2_lines.png'), card2);
   console.log('✅ Test 3 Passed: 2-lines FHD card generated successfully!\n');
 
-  // --- TEST 4: Verification - Verify generated card is decodable ---
-  console.log('--- Test 4: Scanning Generated Full HD Card ---');
+  // --- TEST 4: Generate FHD Card with Long Text (Scaling Test) ---
+  console.log('--- Test 4: Generate FHD Card (Long Text Dynamic Scaling) ---');
+  const cardLong = await generateFHDCard({
+    qrData: testPayload,
+    photoBuffer: samplePhoto,
+    lineCount: 1,
+    line1: '12345678901234567890', // 20 chars max limit
+  });
+  fs.writeFileSync(path.join(outputDir, 'test_card_long_text.png'), cardLong);
+  console.log('✅ Test 4 Passed: Long text card generated with dynamic scaling!\n');
+
+  // --- TEST 5: Verification - Verify generated card is decodable ---
+  console.log('--- Test 5: Scanning Generated Full HD Card ---');
   const rescan = await scanQRCode(card1);
   console.log('Rescan result on generated card:', rescan);
   if (!rescan.success || rescan.data !== testPayload) {
