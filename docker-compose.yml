@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  qr-bot:
+    build: .
+    container_name: qr-generator-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production

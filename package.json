@@ -1,0 +1,20 @@
+{
+  "name": "qr-generator-bot",
+  "version": "1.0.0",
+  "description": "Telegram QR Code generator bot with QR detection, optional logo/photo, and FHD standardized layout.",
+  "type": "module",
+  "main": "src/bot.js",
+  "scripts": {
+    "start": "node src/bot.js",
+    "dev": "node --watch src/bot.js",
+    "test": "node test/test-pipeline.js"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.65",
+    "dotenv": "^16.4.7",
+    "jsqr": "^1.4.0",
+    "qrcode": "^1.5.4",
+    "sharp": "^0.33.5",
+    "telegraf": "^4.16.3"
+  }
+}
